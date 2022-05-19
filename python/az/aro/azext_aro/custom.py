@@ -10,7 +10,7 @@ from azure.cli.core.commands.client_factory import get_subscription_id
 from azure.cli.core.profiles import ResourceType
 from azure.cli.core.util import sdk_no_wait
 from azure.cli.core.azclierror import FileOperationError, ResourceNotFoundError, UnauthorizedError
-from azure.graphrbac.models import GraphErrorException
+from azure.cli.command_modules.role import GraphError
 from msrestazure.azure_exceptions import CloudError
 from msrestazure.tools import resource_id, parse_resource_id
 from msrest.exceptions import HttpOperationError
@@ -73,8 +73,7 @@ def aro_create(cmd,  # pylint: disable=too-many-locals
 
     aad = AADManager(cmd.cli_ctx)
     if client_id is None:
-        app, client_secret = aad.create_application(cluster_resource_group or 'aro-' + random_id)
-        client_id = app.app_id
+        client_id, client_secret = aad.create_application(cluster_resource_group or 'aro-' + random_id)
 
     client_sp = aad.get_service_principal(client_id)
     if not client_sp:
@@ -142,7 +141,7 @@ def aro_create(cmd,  # pylint: disable=too-many-locals
         ],
     )
 
-    sp_obj_ids = [client_sp.object_id, rp_client_sp.object_id]
+    sp_obj_ids = [client_sp, rp_client_sp]
     ensure_resource_permissions(cmd.cli_ctx, oc, True, sp_obj_ids)
 
     return sdk_no_wait(no_wait, client.begin_create_or_update,
@@ -171,13 +170,13 @@ def aro_delete(cmd, client, resource_group_name, resource_name, no_wait=False):
         rp_client_sp = aad.get_service_principal(resolve_rp_client_id())
         if not rp_client_sp:
             raise ResourceNotFoundError("RP service principal not found.")
-    except GraphErrorException as e:
+    except GraphError as e:
         logger.info(e.message)
 
     # Customers frequently remove the Cluster or RP's service principal permissions.
     # Attempt to fix this before performing any action against the cluster
     if rp_client_sp:
-        ensure_resource_permissions(cmd.cli_ctx, oc, False, [rp_client_sp.object_id])
+        ensure_resource_permissions(cmd.cli_ctx, oc, False, [rp_client_sp])
 
     return sdk_no_wait(no_wait, client.begin_delete,
                        resource_group_name=resource_group_name,
@@ -354,7 +353,7 @@ def cluster_application_update(cli_ctx,
         rp_client_sp = aad.get_service_principal(resolve_rp_client_id())
         if not rp_client_sp:
             raise ResourceNotFoundError("RP service principal not found.")
-    except GraphErrorException as e:
+    except GraphError as e:
         if fail:
             logger.error(e.message)
             raise
@@ -371,18 +370,17 @@ def cluster_application_update(cli_ctx,
                 parts = parse_resource_id(oc.cluster_profile.resource_group_id)
                 cluster_resource_group = parts['resource_group']
 
-                app, client_secret = aad.create_application(cluster_resource_group or 'aro-' + random_id)
-                client_id = app.app_id
+                client_id, client_secret = aad.create_application(cluster_resource_group or 'aro-' + random_id)
             else:
-                client_secret = aad.refresh_application_credentials(app.object_id)
-        except GraphErrorException as e:
+                client_secret = aad.add_password(app)
+        except GraphError as e:
             logger.error(e.message)
             raise
 
     # attempt to get/create SP if one was not found.
     try:
         client_sp = aad.get_service_principal(client_id or oc.service_principal_profile.client_id)
-    except GraphErrorException as e:
+    except GraphError as e:
         if fail:
             logger.error(e.message)
             raise
@@ -391,7 +389,7 @@ def cluster_application_update(cli_ctx,
     if fail and not client_sp:
         client_sp = aad.create_service_principal(client_id or oc.service_principal_profile.client_id)
 
-    sp_obj_ids = [sp.object_id for sp in [rp_client_sp, client_sp] if sp]
+    sp_obj_ids = [sp for sp in [rp_client_sp, client_sp] if sp]
     ensure_resource_permissions(cli_ctx, oc, fail, sp_obj_ids)
 
     return client_id, client_secret
