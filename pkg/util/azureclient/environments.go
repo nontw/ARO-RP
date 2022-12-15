@@ -38,8 +38,7 @@ var (
 
 	// USGovernmentCloud contains additional ARO information for the US Gov cloud environment.
 	USGovernmentCloud = AROEnvironment{
-		Environment: azure.USGovernmentCloud,
-
+		Environment:              azure.USGovernmentCloud,
 		ActualCloudName:          "AzureUSGovernment",
 		GenevaMonitoringEndpoint: "https://gcs.monitoring.core.usgovcloudapi.net/",
 		AppSuffix:                "aro.azure.us",
