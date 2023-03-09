@@ -10,7 +10,7 @@ import (
 
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
-	"github.com/form3tech-oss/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -89,4 +89,20 @@ func (tc *tokenClient) GetToken(ctx context.Context, log *logrus.Entry, clientID
 	}
 
 	return sp, nil
+}
+
+// GetObjectId extracts the "oid" claim from a given access jwtToken
+func GetObjectId(jwtToken string) (string, error) {
+	p := jwt.NewParser(jwt.WithoutClaimsValidation())
+	c := &custom{}
+	_, _, err := p.ParseUnverified(jwtToken, c)
+	if err != nil {
+		return "", err
+	}
+	return c.ObjectId, nil
+}
+
+type custom struct {
+	ObjectId string `json:"oid"`
+	jwt.StandardClaims
 }
