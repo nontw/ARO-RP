@@ -155,16 +155,22 @@ func (c *Cluster) Create(ctx context.Context, vnetResourceGroup, clusterName str
 		return fmt.Errorf("fp service principal id is not found")
 	}
 
-	c.log.Infof("creating AAD application")
-	appID, appSecret, err := c.createApplication(ctx, "aro-"+clusterName)
-	if err != nil {
-		return err
-	}
+	appID := os.Getenv("CLUSTER_APP_ID")
+	appSecret := os.Getenv("CLUSTER_APP_SECRET")
+	spID := os.Getenv("CLUSTER_SP_ID")
 
-	spID, err := c.createServicePrincipal(ctx, appID)
-	if err != nil {
-		return err
-	}
+	c.log.Info(appID, appSecret, spID)
+
+	//c.log.Infof("creating AAD application")
+	//appID, appSecret, err := c.createApplication(ctx, "aro-"+clusterName)
+	//if err != nil {
+	//	return err
+	//}
+
+	//spID, err := c.createServicePrincipal(ctx, appID)
+	//if err != nil {
+	//	return err
+	//}
 
 	visibility := api.VisibilityPublic
 
@@ -269,7 +275,7 @@ func (c *Cluster) Create(ctx context.Context, vnetResourceGroup, clusterName str
 		generator.SharedDiskEncryptionSetNameSuffix,
 	)
 
-	c.log.Info("creating role assignments")
+	c.log.Infof("creating role assignments with spID %s", spID)
 	for _, scope := range []struct{ resource, role string }{
 		{"/subscriptions/" + c.env.SubscriptionID() + "/resourceGroups/" + vnetResourceGroup + "/providers/Microsoft.Network/virtualNetworks/dev-vnet", rbac.RoleNetworkContributor},
 		{"/subscriptions/" + c.env.SubscriptionID() + "/resourceGroups/" + vnetResourceGroup + "/providers/Microsoft.Network/routeTables/" + clusterName + "-rt", rbac.RoleNetworkContributor},

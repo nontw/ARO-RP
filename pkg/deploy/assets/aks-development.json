@@ -556,7 +556,7 @@
             "properties": {
                 "nodeResourceGroup": "[concat(resourceGroup().name, '-aks1')]",
                 "apiServerAccessProfile": {
-                    "enablePrivateCluster": true
+                    "enablePrivateCluster": false
                 },
                 "addonProfiles": {
                     "azureKeyvaultSecretsProvider": {
